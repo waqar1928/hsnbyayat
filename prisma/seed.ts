@@ -1,11 +1,11 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { createMariaDbAdapter } from "../src/lib/dbAdapter";
 import bcrypt from "bcryptjs";
 import { DEFAULT_SETTINGS } from "../src/lib/settings";
 import { slugify } from "../src/lib/slug";
 
-const adapter = new PrismaMariaDb(process.env.DATABASE_URL || "");
+const adapter = createMariaDbAdapter();
 const prisma = new PrismaClient({ adapter });
 
 // Top-level categories and their subcategories — admin-manageable from

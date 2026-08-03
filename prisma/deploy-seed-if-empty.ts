@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { createMariaDbAdapter } from "../src/lib/dbAdapter";
 
 // Runs as part of the production build (see package.json's "build" script),
 // on every deploy. Unlike `npm run db:seed` — a dev tool meant to be run
@@ -9,7 +9,7 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 // is genuinely empty (no admin users yet). On every subsequent deploy it's
 // a fast no-op, and it will never clobber an admin password that's since
 // been changed through the live site.
-const adapter = new PrismaMariaDb(process.env.DATABASE_URL || "");
+const adapter = createMariaDbAdapter();
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
