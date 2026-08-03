@@ -295,15 +295,40 @@ Privacy page bodies) — are explicitly annotated `@db.Text` in
    ```
 4. Set `DATABASE_URL` to your Postgres connection string, then `npx prisma migrate deploy`.
 
-> **Note on this session:** I don't have Docker, Homebrew, or general network
-> access in this sandbox, so I could not spin up a real MySQL instance to
-> run a live end-to-end test of this switch. What *is* verified: the schema
-> passes `prisma validate`, the client regenerates cleanly, and the full
-> TypeScript build passes against the regenerated types — so the code is
-> correct as far as static checking can confirm. The first real
-> connection/migration against your actual Hostinger database is the
-> remaining live test; do that before fully relying on it, and tell me if
-> anything errors so we can fix it together.
+### Known issue: `prisma migrate deploy` / `db push` can't reach Hostinger's MySQL
+
+Confirmed by actually deploying to Hostinger: Prisma's CLI (`migrate deploy`,
+`migrate dev`, `db push`, `db execute` — anything that opens its own DB
+connection via Prisma's internal schema engine) fails with
+`P1000: Authentication failed`, even with correct credentials. The `mysql`
+CLI and the app's own `mariadb` driver (via `@prisma/adapter-mariadb`, what
+`src/lib/prisma.ts` actually uses at runtime) connect to the exact same
+database with the exact same credentials without any problem — this is
+specifically Prisma's bundled schema-engine binary failing to negotiate
+with this MariaDB version (11.8), not a credentials or hosting-permissions
+issue.
+
+**Practical effect:** the `build` script does *not* run `prisma migrate
+deploy` (it did originally; removed after confirming it breaks the build
+here). Applying the schema — for the initial setup, and for any future
+migration — means generating the SQL yourself and running it directly
+against the database:
+
+```bash
+# Generates the raw SQL for a schema change without needing a live DB
+# connection (this specific Prisma command doesn't hit the broken engine
+# path), then apply it directly:
+npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --script > /tmp/change.sql
+mysql -u <user> -p -h localhost <dbname> < /tmp/change.sql
+```
+
+Then record it in Prisma's own tracking table so migration history stays
+consistent (see `prisma/migrations/20260803000000_init_mysql` for the
+pattern — a `_prisma_migrations` row per applied migration, checksum from
+`shasum -a 256 migration.sql`). Annoying, but it's a one-time cost per
+schema change, and if you ever move to a different MySQL host (or Prisma
+fixes this engine incompatibility in a later release), `prisma migrate
+deploy` can simply be added back to the `build` script.
 
 ## File storage: local vs. S3 / Cloudflare R2
 
