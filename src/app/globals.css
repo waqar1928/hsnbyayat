@@ -960,7 +960,7 @@ header {
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 10px 20px;
   font-family: var(--mono);
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -968,6 +968,13 @@ header {
   color: #6b6a63;
   max-width: 1240px;
   margin: 0 auto;
+}
+.footer-credit {
+  color: inherit;
+}
+.footer-credit:hover {
+  color: var(--indigo);
+  text-decoration: underline;
 }
 @media (max-width: 820px) {
   .footer-grid {

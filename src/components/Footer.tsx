@@ -76,6 +76,11 @@ export default function Footer({ brand, year }: { brand: BrandSettings; year: nu
           © {year} {brand.name} — Cut &amp; sewn in Lahore
         </div>
         <div>Cash on delivery · Bank transfer</div>
+        <div>
+          <a href="https://synquor.com" target="_blank" rel="noopener noreferrer" className="footer-credit">
+            Synquor by Waqar
+          </a>
+        </div>
       </div>
     </footer>
   );
