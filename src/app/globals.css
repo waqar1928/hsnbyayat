@@ -1784,20 +1784,30 @@ header {
 .admin-sidebar-topline {
   display: flex;
   align-items: center;
+  background: var(--paper);
 }
 .admin-menu-toggle {
   display: none;
   background: none;
-  border: 1px solid #5a5a56;
-  color: var(--paper);
+  border: 1px solid var(--ink);
+  color: var(--ink);
   width: 40px;
   height: 40px;
   font-size: 1rem;
   flex-shrink: 0;
 }
 .admin-sidebar-brand {
+  /* Deliberately light, unlike the rest of the (dark) sidebar: an uploaded
+     logo can be any color a store owner's brand happens to be, and most
+     logos are designed to sit on a light/white background — a dark bar
+     behind an arbitrary uploaded image isn't something we can guarantee
+     contrast for. A light header strip guarantees any logo stays visible,
+     no color-guessing/inversion needed. The text-only fallback wordmark
+     (no logo uploaded) is recolored to match below. */
   padding: 22px 20px;
-  border-bottom: 1px solid #3a3a37;
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
   font-weight: 900;
   font-stretch: 125%;
   font-size: 1.05rem;
@@ -1806,7 +1816,7 @@ header {
   min-width: 0;
 }
 .admin-sidebar-brand span {
-  color: #8b9cdb;
+  color: var(--indigo);
 }
 .admin-sidebar-tag {
   font-family: var(--mono);
@@ -2259,7 +2269,7 @@ header {
     z-index: 20;
   }
   .admin-sidebar-topline {
-    border-bottom: 1px solid #3a3a37;
+    border-bottom: 1px solid var(--ink);
   }
   .admin-menu-toggle {
     display: block;
