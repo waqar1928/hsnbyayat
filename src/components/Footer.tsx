@@ -20,7 +20,22 @@ function SocialLink({ label, url }: { label: string; url: string }) {
   );
 }
 
-export default function Footer({ brand, year }: { brand: BrandSettings; year: number }) {
+/** wa.me links need the full international number as digits only — no "+",
+ * spaces, dashes, or leading zero. "+92 300 0000000" becomes
+ * "923000000000", but a number entered in local Pakistani format instead
+ * (e.g. "0300-0000000", common — the same field is also just displayed as
+ * a regular contact number elsewhere) has no country code at all; passing
+ * that straight to wa.me produces a broken link, so a leading 0 is swapped
+ * for the 92 country code. Empty input stays empty, so SocialLink's own
+ * "not set yet" placeholder still applies. */
+function whatsAppLink(number: string): string {
+  let digits = number.replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("0")) digits = "92" + digits.slice(1);
+  return `https://wa.me/${digits}`;
+}
+
+export default function Footer({ brand, whatsappNumber, year }: { brand: BrandSettings; whatsappNumber: string; year: number }) {
   return (
     <footer className="footer">
       <div className="footer-grid">
@@ -67,7 +82,7 @@ export default function Footer({ brand, year }: { brand: BrandSettings; year: nu
             <SocialLink label="Instagram" url={brand.instagram} />
             <SocialLink label="Facebook" url={brand.facebook} />
             <SocialLink label="TikTok" url={brand.tiktok} />
-            <SocialLink label="WhatsApp" url="" />
+            <SocialLink label="WhatsApp" url={whatsAppLink(whatsappNumber)} />
           </div>
         </div>
       </div>

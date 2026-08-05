@@ -25,6 +25,7 @@ export default async function StorefrontLayout({ children }: Readonly<{ children
   const shippingFee = settings.shippingFee as number;
   const freeShippingThreshold = settings.freeShippingThreshold as number;
   const analytics = settings.analytics as AnalyticsSettings;
+  const whatsappNumber = settings.whatsappNumber as string;
 
   return (
     <>
@@ -35,7 +36,7 @@ export default async function StorefrontLayout({ children }: Readonly<{ children
       <Header brandName={brand.name} logoUrl={brand.logoUrl} collections={collections} />
       {children}
       <Newsletter />
-      <Footer brand={brand} year={new Date().getFullYear()} />
+      <Footer brand={brand} whatsappNumber={whatsappNumber} year={new Date().getFullYear()} />
 
       <SearchPanel />
       <CartDrawer shippingFee={shippingFee} freeShippingThreshold={freeShippingThreshold} />
