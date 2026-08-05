@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "tsx prisma/deploy-seed-if-empty.ts && next build",
-    "start": "next start",
+    "start": "NODE_ENV=production node server.js",
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",

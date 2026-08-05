@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCartStore, cartSubtotal } from "@/lib/cartStore";
 import { useUIStore, useToastStore } from "@/lib/uiStore";
 import { formatPKR } from "@/lib/types";
+import { trackFbEvent } from "@/lib/fbPixel";
 import type { BankDetails } from "@/lib/settings";
 
 type FieldKey = "name" | "phone" | "city" | "address";
@@ -37,6 +38,19 @@ export default function CheckoutModal({
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderResult | null>(null);
+
+  useEffect(() => {
+    if (!checkoutOpen) return;
+    trackFbEvent("InitiateCheckout", {
+      content_ids: items.map((i) => i.productId),
+      value: cartSubtotal(items),
+      currency: "PKR",
+      num_items: items.reduce((n, i) => n + i.qty, 0),
+    });
+    // Fire once per time the checkout modal is opened — not on every cart
+    // edit made while it's open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkoutOpen]);
 
   const sub = cartSubtotal(items);
   const ship = sub === 0 || sub >= freeShippingThreshold ? 0 : shippingFee;
@@ -74,6 +88,13 @@ export default function CheckoutModal({
         setServerError(data.error || "Something went wrong. Please try again.");
         return;
       }
+      trackFbEvent("Purchase", {
+        content_ids: items.map((i) => i.productId),
+        content_type: "product",
+        value: data.total,
+        currency: "PKR",
+        num_items: items.reduce((n, i) => n + i.qty, 0),
+      });
       setResult(data);
     } catch {
       setServerError("Network error — please check your connection and try again.");

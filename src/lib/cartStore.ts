@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { trackFbEvent } from "@/lib/fbPixel";
 
 export type CartItem = {
   variantId: string;
@@ -35,7 +36,14 @@ export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
       items: [],
-      addItem: (item) =>
+      addItem: (item) => {
+        trackFbEvent("AddToCart", {
+          content_ids: [item.productId],
+          content_name: item.name,
+          content_type: "product",
+          value: item.unitPrice * item.qty,
+          currency: "PKR",
+        });
         set((state) => {
           const existing = state.items.find((i) => i.variantId === item.variantId);
           if (existing) {
@@ -46,7 +54,8 @@ export const useCartStore = create<CartState>()(
             };
           }
           return { items: [...state.items, item] };
-        }),
+        });
+      },
       changeQty: (variantId, delta) =>
         set((state) => {
           const items = state.items

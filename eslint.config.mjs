@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // server.js is a plain Node.js entry point Passenger/hosting executes
+    // directly, with no build/transpile step — it has to stay CommonJS
+    // (require/module.exports), which the rest of the TypeScript codebase
+    // correctly forbids.
+    "server.js",
   ]),
 ]);
 

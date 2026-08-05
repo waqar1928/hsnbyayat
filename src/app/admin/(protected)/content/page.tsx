@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminTopbar from "@/components/admin/AdminTopbar";
-import type { HeroSlide, BankDetails, InfoPages, BrandSettings } from "@/lib/settings";
+import type { HeroSlide, BankDetails, InfoPages, BrandSettings, AnalyticsSettings } from "@/lib/settings";
 import { adminFetch } from "@/lib/adminFetch";
 
 type AllSettings = {
@@ -15,6 +15,7 @@ type AllSettings = {
   infoPages: InfoPages;
   marqueeText: string;
   brand: BrandSettings;
+  analytics: AnalyticsSettings;
 };
 
 function SaveButton({ onClick, saved }: { onClick: () => void; saved: boolean }) {
@@ -452,6 +453,32 @@ export default function AdminContentPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Analytics */}
+        <div className="admin-panel">
+          <div className="admin-panel-head">
+            <h2>Analytics</h2>
+            <SaveButton saved={savedKey === "analytics"} onClick={() => save("analytics", settings.analytics)} />
+          </div>
+          <div className="admin-panel-body">
+            <div className="field">
+              <label>Meta (Facebook/Instagram) Pixel ID</label>
+              <input
+                placeholder="e.g. 1234567890123456"
+                value={settings.analytics.facebookPixelId}
+                onChange={(e) =>
+                  setSettings({ ...settings, analytics: { ...settings.analytics, facebookPixelId: e.target.value.trim() } })
+                }
+              />
+              <p className="note" style={{ marginTop: 6 }}>
+                Find this in Meta Events Manager → Data Sources → your pixel → Settings. Leave blank if you&apos;re not
+                running Facebook/Instagram ads — nothing loads on the storefront until this is set. Once set, page
+                views, add-to-cart, checkout, and purchase events are tracked automatically for ad optimization and
+                reporting.
+              </p>
+            </div>
           </div>
         </div>
       </div>

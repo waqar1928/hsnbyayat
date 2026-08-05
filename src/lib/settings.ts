@@ -13,6 +13,7 @@ export const SETTING_KEYS = {
   INFO_PAGES: "infoPages",
   MARQUEE_TEXT: "marqueeText",
   BRAND: "brand",
+  ANALYTICS: "analytics",
 } as const;
 
 export type HeroSlide = {
@@ -54,6 +55,14 @@ export type BrandSettings = {
   // the text wordmark (<BrandWordmark>) in the header, admin sidebar, admin
   // login, and printed packing slips. Null falls back to the text wordmark.
   logoUrl: string | null;
+};
+
+// Ad-platform pixel IDs — public by design (they're meant to be embedded in
+// client-side HTML), so no secrecy concern storing them the same way as
+// other admin-editable settings. Empty string means "not configured, don't
+// load the script" — see components/FacebookPixel.tsx.
+export type AnalyticsSettings = {
+  facebookPixelId: string;
 };
 
 export const DEFAULT_SETTINGS: Record<string, unknown> = {
@@ -153,6 +162,9 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
     tiktok: "",
     logoUrl: null,
   } satisfies BrandSettings,
+  [SETTING_KEYS.ANALYTICS]: {
+    facebookPixelId: "",
+  } satisfies AnalyticsSettings,
 };
 
 /** Lowercase, hyphenated brand name — used for export filenames etc. */
@@ -222,6 +234,7 @@ export async function getAllPublicSettings() {
     SETTING_KEYS.INFO_PAGES,
     SETTING_KEYS.MARQUEE_TEXT,
     SETTING_KEYS.BRAND,
+    SETTING_KEYS.ANALYTICS,
   ]);
 }
 

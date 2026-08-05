@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useCartStore } from "@/lib/cartStore";
 import { useUIStore, useToastStore } from "@/lib/uiStore";
 import { effectivePrice, formatPKR, type ProductDetailDTO } from "@/lib/types";
+import { trackFbEvent } from "@/lib/fbPixel";
 import GarmentPlaceholder from "./GarmentPlaceholder";
 
 export default function ProductDetailView({ product }: { product: ProductDetailDTO }) {
@@ -15,6 +16,21 @@ export default function ProductDetailView({ product }: { product: ProductDetailD
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
   const show = useToastStore((s) => s.show);
+
+  useEffect(() => {
+    trackFbEvent("ViewContent", {
+      content_ids: [product.id],
+      content_name: product.name,
+      content_type: "product",
+      value: effectivePrice(product),
+      currency: "PKR",
+    });
+    // Fire once per product shown — deliberately not depending on
+    // effectivePrice's own inputs beyond product.id, since re-tracking on
+    // every price recompute (e.g. a sale toggling) isn't what "viewed this
+    // product" means.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]);
 
   const sale = !!product.salePct;
   const selectedSize = product.sizes.find((s) => s.size === size);
