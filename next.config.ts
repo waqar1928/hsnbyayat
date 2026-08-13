@@ -31,6 +31,20 @@ const nextConfig: NextConfig = {
     remotePatterns: s3RemotePattern(),
   },
 
+  // On hosts where public/uploads is a symlink to a location outside the
+  // project directory (see scripts/link-persistent-uploads.js — needed so
+  // uploaded files survive across deploys on platforms that build into a
+  // fresh directory every time), Next's build-time file tracer refuses to
+  // follow it ("Symlink ... points out of the filesystem root") and the
+  // build fails. Uploaded files are runtime content served directly by the
+  // Node process, not a build dependency of any route, so there's nothing
+  // useful for the tracer to include from that directory in the first
+  // place — excluding it for every route is the correct fix, not a
+  // workaround.
+  outputFileTracingExcludes: {
+    "/*": ["public/uploads/**/*"],
+  },
+
   async headers() {
     return [
       {
