@@ -12,7 +12,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "postinstall": "node scripts/link-persistent-uploads.js && prisma generate"
+    "postinstall": "node scripts/sync-persistent-uploads.js && prisma generate",
+    "test": "tsx --test \"test/**/*.test.*\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1100.0",

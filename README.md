@@ -343,15 +343,26 @@ directory (`hbuilds/versions/<id>/nodejs`), so `public/uploads` starts
 empty every time, silently 404ing anything uploaded before the next deploy
 even though the database still references it.
 
-**The fix already wired up for this**: `scripts/link-persistent-uploads.js`
-runs on every `npm install` (via `postinstall`) and, if `PERSISTENT_UPLOADS_DIR`
-is set, replaces `public/uploads` with a symlink to that fixed path —
-outside the versioned build tree, so it's the same real directory across
-every deploy. On the current Hostinger setup this is set to
+**The fix already wired up for this**: a two-part copy-based sync, not a
+symlink (a symlink pointing outside the project root was tried first, but
+Next.js's build-time file tracer refuses to follow a symlink like that —
+"Symlink ... points out of the filesystem root" — and fails the whole
+production build outright).
+
+1. `scripts/sync-persistent-uploads.js` runs on every `npm install` (via
+   `postinstall`, so before every `next build`) and, if
+   `PERSISTENT_UPLOADS_DIR` is set, copies whatever's already in that
+   directory into a real, ordinary `public/uploads` — never deletes
+   anything from the persistent directory, safe to run repeatedly.
+2. `src/lib/storage.ts`'s local-storage save/delete functions mirror every
+   new upload (and deletion) straight to `PERSISTENT_UPLOADS_DIR` too, so
+   it's there for the *next* deploy's copy step to pick up.
+
+On the current Hostinger setup, `PERSISTENT_UPLOADS_DIR` is set to
 `/home/<user>/domains/<domain>/persistent-uploads` (a sibling of `hbuilds/`,
 set once as an environment variable in hPanel, not in the repo). Hosts
 that don't need this (local dev, Docker/VPS with one stable directory)
-just don't set the env var, and the script no-ops.
+just don't set the env var, and both halves of this no-op entirely.
 
 To switch to S3-compatible storage instead (needed for Vercel, or just
 preferred — sidesteps this whole class of problem structurally):
