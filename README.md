@@ -332,13 +332,29 @@ deploy` can simply be added back to the `build` script.
 
 ## File storage: local vs. S3 / Cloudflare R2
 
-Local disk storage (`STORAGE_DRIVER=local`, the default) is fine as long as
-the app runs on a host with a **persistent** filesystem — a real VPS, a
-Docker container with a volume, or shared hosting like Hostinger. It is
-**not** fine on Vercel or other serverless hosts, where the filesystem is
-wiped on every deploy and uploaded photos/logos would vanish.
+Local disk storage (`STORAGE_DRIVER=local`, the default) needs the app to
+run somewhere with a **persistent, stable** filesystem path — a real VPS or
+a Docker container with a volume, where `public/uploads` is the same real
+directory on every deploy. It is **not** fine on Vercel or other serverless
+hosts (filesystem wiped on every deploy), and — confirmed the hard way in
+production — **not automatically fine on Hostinger's Git-based Node.js App
+deploys either**: each deploy there builds into a brand-new versioned
+directory (`hbuilds/versions/<id>/nodejs`), so `public/uploads` starts
+empty every time, silently 404ing anything uploaded before the next deploy
+even though the database still references it.
 
-To switch to S3-compatible storage (needed for Vercel, or just preferred):
+**The fix already wired up for this**: `scripts/link-persistent-uploads.js`
+runs on every `npm install` (via `postinstall`) and, if `PERSISTENT_UPLOADS_DIR`
+is set, replaces `public/uploads` with a symlink to that fixed path —
+outside the versioned build tree, so it's the same real directory across
+every deploy. On the current Hostinger setup this is set to
+`/home/<user>/domains/<domain>/persistent-uploads` (a sibling of `hbuilds/`,
+set once as an environment variable in hPanel, not in the repo). Hosts
+that don't need this (local dev, Docker/VPS with one stable directory)
+just don't set the env var, and the script no-ops.
+
+To switch to S3-compatible storage instead (needed for Vercel, or just
+preferred — sidesteps this whole class of problem structurally):
 set `STORAGE_DRIVER=s3` and fill in the `S3_*` variables in `.env`
 (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
 `S3_PUBLIC_BASE_URL`). No code changes needed — `src/lib/storage.ts` is the

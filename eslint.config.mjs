@@ -15,8 +15,12 @@ const eslintConfig = defineConfig([
     // server.js is a plain Node.js entry point Passenger/hosting executes
     // directly, with no build/transpile step — it has to stay CommonJS
     // (require/module.exports), which the rest of the TypeScript codebase
-    // correctly forbids.
+    // correctly forbids. Same reasoning for scripts/** — plain Node
+    // utilities that run before/outside the app's own build step (e.g.
+    // scripts/link-persistent-uploads.js runs in postinstall, before
+    // TypeScript/Prisma are even generated yet).
     "server.js",
+    "scripts/**",
   ]),
 ]);
 
