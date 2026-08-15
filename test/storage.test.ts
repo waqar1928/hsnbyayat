@@ -4,123 +4,180 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// storage.ts reads UPLOAD_DIR from process.cwd() at import time (and reads
-// PERSISTENT_UPLOADS_DIR at call time), so each test that needs a specific
-// cwd/env combination isolates it: chdir into a fresh temp project root,
-// re-import storage.ts fresh (Node caches modules by resolved path, and
-// since UPLOAD_DIR is computed once at import time, a fresh import per cwd
-// avoids tests contaminating each other's UPLOAD_DIR).
+// storage.ts reads PERSISTENT_UPLOADS_DIR at call time (falling back to
+// public/uploads under process.cwd() only when unset), so each test that
+// needs a specific env/cwd combination isolates it: set env vars, chdir
+// into a fresh temp project root if needed, and re-import storage.ts fresh
+// via a cache-busting query string (Node caches modules by resolved path,
+// and repeated imports of the exact same URL would return the same module
+// instance).
 async function freshStorageModule() {
   const modUrl = `../src/lib/storage.ts?t=${Date.now()}-${Math.random()}`;
   return import(modUrl);
 }
 
-function makeTempProjectRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "storage-test-"));
-  fs.mkdirSync(path.join(root, "public", "uploads"), { recursive: true });
-  return root;
+async function withEnv<T>(overrides: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  const prev: Record<string, string | undefined> = {};
+  for (const k of Object.keys(overrides)) prev[k] = process.env[k];
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of Object.entries(prev)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
 }
 
-test("saveLocal (via saveUpload) writes only to public/uploads when PERSISTENT_UPLOADS_DIR is unset", async () => {
-  const root = makeTempProjectRoot();
-  const prevCwd = process.cwd();
-  const prevPersistent = process.env.PERSISTENT_UPLOADS_DIR;
-  const prevDriver = process.env.STORAGE_DRIVER;
-  delete process.env.PERSISTENT_UPLOADS_DIR;
-  delete process.env.STORAGE_DRIVER;
-  process.chdir(root);
-  try {
-    const { saveUpload } = await freshStorageModule();
-    const result = await saveUpload(Buffer.from("hello"), "photo.jpg", "image/jpeg");
-
-    assert.equal(fs.existsSync(path.join(root, "public", "uploads", result.key)), true);
-    assert.equal(fs.readFileSync(path.join(root, "public", "uploads", result.key), "utf-8"), "hello");
-  } finally {
-    process.chdir(prevCwd);
-    if (prevPersistent !== undefined) process.env.PERSISTENT_UPLOADS_DIR = prevPersistent;
-    if (prevDriver !== undefined) process.env.STORAGE_DRIVER = prevDriver;
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("saveLocal (via saveUpload) writes to BOTH public/uploads and PERSISTENT_UPLOADS_DIR when set", async () => {
-  const root = makeTempProjectRoot();
+test("saveUpload (local driver) writes to PERSISTENT_UPLOADS_DIR and returns an /api/uploads/ URL", async () => {
   const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
-  const prevCwd = process.cwd();
-  const prevPersistent = process.env.PERSISTENT_UPLOADS_DIR;
-  const prevDriver = process.env.STORAGE_DRIVER;
-  process.env.PERSISTENT_UPLOADS_DIR = persistentDir;
-  delete process.env.STORAGE_DRIVER;
-  process.chdir(root);
   try {
-    const { saveUpload } = await freshStorageModule();
-    const result = await saveUpload(Buffer.from("dual-write"), "photo.png", "image/png");
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { saveUpload } = await freshStorageModule();
+      const result = await saveUpload(Buffer.from("hello"), "photo.jpg", "image/jpeg");
 
-    const inUploads = path.join(root, "public", "uploads", result.key);
-    const inPersistent = path.join(persistentDir, result.key);
-    assert.equal(fs.existsSync(inUploads), true, "should be written to public/uploads");
-    assert.equal(fs.existsSync(inPersistent), true, "should be mirrored to PERSISTENT_UPLOADS_DIR");
-    assert.equal(fs.readFileSync(inUploads, "utf-8"), "dual-write");
-    assert.equal(fs.readFileSync(inPersistent, "utf-8"), "dual-write");
+      assert.match(result.url, /^\/api\/uploads\/.+\.jpg$/);
+      assert.equal(fs.existsSync(path.join(persistentDir, result.key)), true);
+      assert.equal(fs.readFileSync(path.join(persistentDir, result.key), "utf-8"), "hello");
+    });
   } finally {
-    process.chdir(prevCwd);
-    if (prevPersistent !== undefined) process.env.PERSISTENT_UPLOADS_DIR = prevPersistent;
-    else delete process.env.PERSISTENT_UPLOADS_DIR;
-    if (prevDriver !== undefined) process.env.STORAGE_DRIVER = prevDriver;
-    fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(persistentDir, { recursive: true, force: true });
   }
 });
 
-test("deleteLocal (via deleteUpload) removes the file from BOTH locations when PERSISTENT_UPLOADS_DIR is set", async () => {
-  const root = makeTempProjectRoot();
-  const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
+test("falls back to public/uploads (under cwd) when PERSISTENT_UPLOADS_DIR is unset — local dev", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "devroot-"));
   const prevCwd = process.cwd();
-  const prevPersistent = process.env.PERSISTENT_UPLOADS_DIR;
-  const prevDriver = process.env.STORAGE_DRIVER;
-  process.env.PERSISTENT_UPLOADS_DIR = persistentDir;
-  delete process.env.STORAGE_DRIVER;
   process.chdir(root);
   try {
-    const { saveUpload, deleteUpload } = await freshStorageModule();
-    const result = await saveUpload(Buffer.from("to-delete"), "photo.jpg", "image/jpeg");
-    const inUploads = path.join(root, "public", "uploads", result.key);
-    const inPersistent = path.join(persistentDir, result.key);
-    assert.equal(fs.existsSync(inUploads), true);
-    assert.equal(fs.existsSync(inPersistent), true);
+    await withEnv({ PERSISTENT_UPLOADS_DIR: undefined, STORAGE_DRIVER: undefined }, async () => {
+      const { saveUpload } = await freshStorageModule();
+      const result = await saveUpload(Buffer.from("dev-upload"), "photo.png", "image/png");
 
-    await deleteUpload(result.key);
-
-    assert.equal(fs.existsSync(inUploads), false, "should be removed from public/uploads");
-    assert.equal(fs.existsSync(inPersistent), false, "should be removed from PERSISTENT_UPLOADS_DIR too");
+      const expectedPath = path.join(root, "public", "uploads", result.key);
+      assert.equal(fs.existsSync(expectedPath), true);
+      assert.equal(fs.readFileSync(expectedPath, "utf-8"), "dev-upload");
+    });
   } finally {
     process.chdir(prevCwd);
-    if (prevPersistent !== undefined) process.env.PERSISTENT_UPLOADS_DIR = prevPersistent;
-    else delete process.env.PERSISTENT_UPLOADS_DIR;
-    if (prevDriver !== undefined) process.env.STORAGE_DRIVER = prevDriver;
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("deleteUpload removes the file from PERSISTENT_UPLOADS_DIR", async () => {
+  const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
+  try {
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { saveUpload, deleteUpload } = await freshStorageModule();
+      const result = await saveUpload(Buffer.from("to-delete"), "photo.jpg", "image/jpeg");
+      assert.equal(fs.existsSync(path.join(persistentDir, result.key)), true);
+
+      await deleteUpload(result.key);
+
+      assert.equal(fs.existsSync(path.join(persistentDir, result.key)), false);
+    });
+  } finally {
     fs.rmSync(persistentDir, { recursive: true, force: true });
   }
 });
 
-test("deleting a nonexistent key does not throw, even with PERSISTENT_UPLOADS_DIR set", async () => {
-  const root = makeTempProjectRoot();
+test("deleting a nonexistent key does not throw", async () => {
   const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
-  const prevCwd = process.cwd();
-  const prevPersistent = process.env.PERSISTENT_UPLOADS_DIR;
-  const prevDriver = process.env.STORAGE_DRIVER;
-  process.env.PERSISTENT_UPLOADS_DIR = persistentDir;
-  delete process.env.STORAGE_DRIVER;
-  process.chdir(root);
   try {
-    const { deleteUpload } = await freshStorageModule();
-    await assert.doesNotReject(() => deleteUpload("never-existed.jpg"));
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { deleteUpload } = await freshStorageModule();
+      await assert.doesNotReject(() => deleteUpload("never-existed.jpg"));
+    });
   } finally {
-    process.chdir(prevCwd);
-    if (prevPersistent !== undefined) process.env.PERSISTENT_UPLOADS_DIR = prevPersistent;
-    else delete process.env.PERSISTENT_UPLOADS_DIR;
-    if (prevDriver !== undefined) process.env.STORAGE_DRIVER = prevDriver;
-    fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(persistentDir, { recursive: true, force: true });
   }
+});
+
+test("uploadExists reflects whether the file is actually on disk", async () => {
+  const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
+  try {
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { saveUpload, uploadExists } = await freshStorageModule();
+      const result = await saveUpload(Buffer.from("exists"), "photo.jpg", "image/jpeg");
+
+      assert.equal(await uploadExists(result.key), true);
+      assert.equal(await uploadExists("does-not-exist.jpg"), false);
+    });
+  } finally {
+    fs.rmSync(persistentDir, { recursive: true, force: true });
+  }
+});
+
+test("isSafeKey accepts well-formed keys and rejects path-traversal / malformed input", async () => {
+  const { isSafeKey } = await freshStorageModule();
+
+  assert.equal(isSafeKey("a1b2c3d4-1234-4321-9999-abcdef012345.png"), true);
+  assert.equal(isSafeKey("logo.jpg"), true);
+
+  assert.equal(isSafeKey("../../etc/passwd"), false);
+  assert.equal(isSafeKey("..%2f..%2fetc%2fpasswd"), false);
+  assert.equal(isSafeKey("foo/bar.png"), false);
+  assert.equal(isSafeKey("noext"), false);
+  assert.equal(isSafeKey(".hidden.png"), false);
+  assert.equal(isSafeKey(""), false);
+});
+
+test("uploadExists / readUploadStream refuse path-traversal keys even if the target file exists", async () => {
+  const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
+  // A real file just outside persistentDir, which a traversal key would target.
+  const secretPath = path.join(path.dirname(persistentDir), "secret.txt");
+  fs.writeFileSync(secretPath, "should never be servable");
+
+  try {
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { uploadExists, readUploadStream } = await freshStorageModule();
+
+      assert.equal(await uploadExists("../secret.txt"), false);
+      assert.equal(await readUploadStream("../secret.txt"), null);
+    });
+  } finally {
+    fs.rmSync(persistentDir, { recursive: true, force: true });
+    fs.rmSync(secretPath, { force: true });
+  }
+});
+
+test("readUploadStream returns a readable stream with the correct size for an existing file", async () => {
+  const persistentDir = fs.mkdtempSync(path.join(os.tmpdir(), "persistent-"));
+  try {
+    await withEnv({ PERSISTENT_UPLOADS_DIR: persistentDir, STORAGE_DRIVER: undefined }, async () => {
+      const { saveUpload, readUploadStream } = await freshStorageModule();
+      const content = "stream-me-please";
+      const result = await saveUpload(Buffer.from(content), "photo.jpg", "image/jpeg");
+
+      const file = await readUploadStream(result.key);
+      assert.ok(file);
+      assert.equal(file!.size, Buffer.byteLength(content));
+
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of file!.stream as unknown as AsyncIterable<Uint8Array>) {
+        chunks.push(chunk);
+      }
+      assert.equal(Buffer.concat(chunks).toString("utf-8"), content);
+    });
+  } finally {
+    fs.rmSync(persistentDir, { recursive: true, force: true });
+  }
+});
+
+test("keyFromStoredUrl handles both the legacy /uploads/ and current /api/uploads/ URL formats", async () => {
+  const { keyFromStoredUrl } = await freshStorageModule();
+
+  assert.equal(keyFromStoredUrl("/uploads/abc-123.png"), "abc-123.png");
+  assert.equal(keyFromStoredUrl("/api/uploads/abc-123.png"), "abc-123.png");
+  assert.equal(keyFromStoredUrl("https://bucket.example.com/abc-123.png"), null);
+  assert.equal(keyFromStoredUrl("/uploads/../../etc/passwd"), null);
+});
+
+test("getPublicUrl always produces the /api/uploads/ form", async () => {
+  const { getPublicUrl } = await freshStorageModule();
+  assert.equal(getPublicUrl("abc-123.png"), "/api/uploads/abc-123.png");
 });

@@ -332,45 +332,68 @@ deploy` can simply be added back to the `build` script.
 
 ## File storage: local vs. S3 / Cloudflare R2
 
-Local disk storage (`STORAGE_DRIVER=local`, the default) needs the app to
-run somewhere with a **persistent, stable** filesystem path — a real VPS or
-a Docker container with a volume, where `public/uploads` is the same real
-directory on every deploy. It is **not** fine on Vercel or other serverless
-hosts (filesystem wiped on every deploy), and — confirmed the hard way in
-production — **not automatically fine on Hostinger's Git-based Node.js App
-deploys either**: each deploy there builds into a brand-new versioned
-directory (`hbuilds/versions/<id>/nodejs`), so `public/uploads` starts
-empty every time, silently 404ing anything uploaded before the next deploy
-even though the database still references it.
+Local disk storage (`STORAGE_DRIVER=local`, the default) writes every
+upload to `PERSISTENT_UPLOADS_DIR` — a filesystem path **outside** the
+project/build directory — and serves it back out through a real route
+handler, `src/app/api/uploads/[...key]/route.ts`, rather than as a static
+file under `public/`. Two separate production bugs, both found and fixed
+the hard way on Hostinger, are why it's built this way instead of the more
+obvious "just use `public/uploads`":
 
-**The fix already wired up for this**: a two-part copy-based sync, not a
-symlink (a symlink pointing outside the project root was tried first, but
-Next.js's build-time file tracer refuses to follow a symlink like that —
-"Symlink ... points out of the filesystem root" — and fails the whole
-production build outright).
+1. **Deploys wipe `public/uploads`.** Hostinger's Git-based Node.js App
+   deploys build into a brand-new versioned directory
+   (`hbuilds/versions/<id>/nodejs`) every time, so anything written only
+   inside the project starts empty on the next deploy. `PERSISTENT_UPLOADS_DIR`
+   is a fixed path outside that versioned tree (set once as an environment
+   variable in hPanel, not in the repo — on the current setup it's
+   `/home/<user>/domains/<domain>/persistent-uploads`), so files survive
+   every deploy regardless of what happens to the build directory.
+   (A symlink from `public/uploads` into that directory was tried first —
+   don't do that either: Next's build-time file tracer refuses to follow a
+   symlink pointing outside the project root and fails the whole production
+   build. A copy-into-`public/uploads`-before-build step was tried next —
+   works, but see point 2, it doesn't actually solve the real problem.)
 
-1. `scripts/sync-persistent-uploads.js` runs on every `npm install` (via
-   `postinstall`, so before every `next build`) and, if
-   `PERSISTENT_UPLOADS_DIR` is set, copies whatever's already in that
-   directory into a real, ordinary `public/uploads` — never deletes
-   anything from the persistent directory, safe to run repeatedly.
-2. `src/lib/storage.ts`'s local-storage save/delete functions mirror every
-   new upload (and deletion) straight to `PERSISTENT_UPLOADS_DIR` too, so
-   it's there for the *next* deploy's copy step to pick up.
+2. **Next's image optimizer can't reliably see `public/uploads` even when
+   it's populated.** On Hostinger, Passenger's front-end serves anything
+   under `public/` directly from disk, bypassing the Node app entirely.
+   Next's built-in image optimizer (`/_next/image`, used by every
+   `<Image>`) fetches *local* image URLs differently: it simulates the
+   request in-process against the Node app's own request handler, which
+   never touches Passenger's static-file path. Confirmed in production:
+   every local product image's optimized variant 400'd ("isn't a valid
+   image") — not just new uploads, *all* of them — while the raw
+   `/uploads/<file>` URL kept loading fine. A route handler has no
+   static-file equivalent for Passenger to shortcut, so a real external
+   request and the optimizer's internal one are guaranteed to hit the exact
+   same code path, which is why `/api/uploads/[...key]` is a route handler
+   and not a directory Passenger/Next can special-case differently.
 
-On the current Hostinger setup, `PERSISTENT_UPLOADS_DIR` is set to
-`/home/<user>/domains/<domain>/persistent-uploads` (a sibling of `hbuilds/`,
-set once as an environment variable in hPanel, not in the repo). Hosts
-that don't need this (local dev, Docker/VPS with one stable directory)
-just don't set the env var, and both halves of this no-op entirely.
+`src/lib/storage.ts` is the single abstraction every upload path goes
+through: `saveUpload`, `deleteUpload`, plus `uploadExists`,
+`readUploadStream`, `getPublicUrl`, `keyFromStoredUrl`, and
+`ensureDirectories` for the route handler and migration script to share.
+Product/brand records store only the public URL (`/api/uploads/<key>`),
+never a filesystem path. Local dev falls back to `public/uploads` under
+the project root when `PERSISTENT_UPLOADS_DIR` isn't set, so nothing extra
+is needed to test uploads locally.
+
+Rows created before this fix may still have the old `/uploads/<key>` URL
+format in the database; `prisma/migrate-legacy-uploads.ts` runs on every
+build (see the `build` script) and rewrites them to `/api/uploads/<key>`
+once it confirms the underlying file is actually present in
+`PERSISTENT_UPLOADS_DIR` — it never repoints a row at a URL that would
+404, and it's a no-op once everything's migrated.
 
 To switch to S3-compatible storage instead (needed for Vercel, or just
-preferred — sidesteps this whole class of problem structurally):
-set `STORAGE_DRIVER=s3` and fill in the `S3_*` variables in `.env`
+preferred — sidesteps this whole class of problem structurally): set
+`STORAGE_DRIVER=s3` and fill in the `S3_*` variables in `.env`
 (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
-`S3_PUBLIC_BASE_URL`). No code changes needed — `src/lib/storage.ts` is the
-single abstraction every upload path goes through (`saveUpload` /
-`deleteUpload`), and it branches on `STORAGE_DRIVER` at call time.
+`S3_PUBLIC_BASE_URL`). No code changes needed — `saveUpload`/`deleteUpload`
+branch on `STORAGE_DRIVER` at call time, and S3-stored images are served
+directly from the bucket's public URL (already allow-listed for
+`next/image` via `S3_PUBLIC_BASE_URL` in `next.config.ts`), never through
+`/api/uploads/*`.
 
 ## Deployment
 

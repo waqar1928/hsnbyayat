@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { jsonError, notFound, unauthorized, zodErrorResponse } from "@/lib/apiError";
 import { updateProductSchema, productToggleSchema } from "@/lib/validation/product";
 import { pctFromPrice } from "@/lib/money";
-import { deleteUpload } from "@/lib/storage";
+import { deleteUpload, keyFromStoredUrl } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
     // transaction since storage isn't transactional; a stray orphaned file
     // is a much smaller problem than losing product data.
     for (const img of removedImages) {
-      const key = img.url.split("/uploads/")[1];
+      const key = keyFromStoredUrl(img.url);
       if (key) deleteUpload(key).catch(() => {});
     }
 
