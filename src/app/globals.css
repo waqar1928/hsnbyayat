@@ -2395,3 +2395,403 @@ header {
     max-width: none;
   }
 }
+
+/* ============================================================
+   Reviews, Size Guide, Banners, Lightbox — added for product
+   reviews / size guide / multi-image gallery / homepage banners.
+   ============================================================ */
+
+/* --- Star rating --- */
+.star-rating {
+  display: inline-flex;
+  gap: 2px;
+}
+.star {
+  color: var(--line);
+  line-height: 1;
+}
+.star.filled {
+  color: var(--indigo);
+}
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+}
+
+/* --- PDP rating line + size guide trigger --- */
+.pdp-rating-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+.pdp-size-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.size-guide-link {
+  background: none;
+  border: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-decoration: underline;
+  color: var(--indigo);
+  cursor: pointer;
+  padding: 0;
+}
+.size-guide-link:hover {
+  color: var(--ink);
+}
+
+/* --- Reviews section --- */
+.pdp-reviews-anchor {
+  grid-column: 1 / -1;
+  margin-top: 20px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 90px;
+}
+.pdp-section-heading {
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 1.2rem;
+  margin-bottom: 20px;
+}
+.reviews-section {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 40px;
+}
+.reviews-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.reviews-avg {
+  text-align: center;
+  background: var(--white);
+  border: 1px solid var(--line);
+  padding: 20px;
+}
+.reviews-avg-number {
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.reviews-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reviews-breakdown-row {
+  display: grid;
+  grid-template-columns: 30px 1fr 24px;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.reviews-bar {
+  height: 6px;
+  background: var(--tag);
+  overflow: hidden;
+}
+.reviews-bar-fill {
+  height: 100%;
+  background: var(--indigo);
+}
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.review-item {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+}
+.review-item-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.review-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.review-body {
+  font-size: 0.92rem;
+  color: #44443f;
+  line-height: 1.7;
+  margin-bottom: 8px;
+}
+@media (max-width: 820px) {
+  .reviews-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Auth modal tabs (customer login/register) --- */
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.auth-tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #6b6a63;
+}
+.auth-tabs button.active {
+  color: var(--ink);
+  border-bottom-color: var(--indigo);
+}
+
+/* --- Size guide table --- */
+.size-guide-table-wrap {
+  overflow-x: auto;
+}
+.size-guide-table {
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+/* --- Lightbox (PDP gallery zoom) --- */
+.lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 23, 21, 0.92);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox.open {
+  display: flex;
+}
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: var(--white);
+  font-size: 1.4rem;
+  z-index: 1;
+}
+.lightbox-img-wrap {
+  position: relative;
+  width: min(92vw, 900px);
+  height: min(86vh, 900px);
+}
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: var(--white);
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  cursor: pointer;
+  line-height: 1;
+}
+.lightbox-nav.prev {
+  left: -4px;
+}
+.lightbox-nav.next {
+  right: -4px;
+}
+@media (max-width: 620px) {
+  .lightbox-nav {
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+  }
+}
+
+/* --- Admin: image thumb primary/replace actions (ProductForm) --- */
+.image-thumb-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(23, 23, 21, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.image-thumb:hover .image-thumb-actions,
+.image-thumb:focus-within .image-thumb-actions {
+  opacity: 1;
+}
+.image-thumb-actions .admin-btn {
+  flex: 1;
+  font-size: 0.65rem;
+  padding: 4px 6px;
+  background: var(--white);
+}
+
+/* --- Homepage banner carousel --- */
+.banner-carousel {
+  position: relative;
+  margin: 0 auto;
+  max-width: 1440px;
+  overflow: hidden;
+}
+.banner-slide {
+  position: relative;
+  display: none;
+  aspect-ratio: 1920 / 700;
+  color: var(--white);
+}
+.banner-slide.active {
+  display: block;
+}
+.banner-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.banner-slide-mobile {
+  display: none;
+}
+.banner-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 60px;
+  background: linear-gradient(90deg, rgba(23, 23, 21, 0.55) 0%, rgba(23, 23, 21, 0) 60%);
+}
+.banner-heading {
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 2.2rem;
+  max-width: 560px;
+}
+.banner-desc {
+  max-width: 480px;
+  font-size: 0.95rem;
+}
+.banner-cta {
+  margin-top: 8px;
+  background: var(--white);
+  color: var(--ink);
+  padding: 10px 22px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+.banner-dots {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+.banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--white);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.banner-dot.active {
+  background: var(--white);
+}
+@media (max-width: 820px) {
+  .banner-slide {
+    aspect-ratio: 1080 / 1350;
+  }
+  .banner-slide-desktop {
+    display: none;
+  }
+  .banner-slide-mobile {
+    display: block;
+  }
+  .banner-content {
+    padding: 26px 22px;
+    background: linear-gradient(0deg, rgba(23, 23, 21, 0.6) 0%, rgba(23, 23, 21, 0) 45%);
+    justify-content: flex-end;
+  }
+  .banner-heading {
+    font-size: 1.5rem;
+  }
+}
+
+/* --- Admin: Banners / Size Guides forms --- */
+.banner-admin-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.banner-admin-thumb {
+  width: 120px;
+  height: 44px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.size-guide-columns-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.size-guide-col-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--tag);
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+.size-guide-col-chip button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.size-guide-entry-row {
+  display: grid;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+@media (max-width: 620px) {
+  .reviews-avg-number {
+    font-size: 2rem;
+  }
+}

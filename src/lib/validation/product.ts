@@ -35,6 +35,9 @@ export const createProductSchema = z.object({
   isActive: z.boolean().default(true),
   variants: z.array(variantInputSchema).min(1),
   images: z.array(productImageInputSchema).default([]),
+  // Product-specific size guide override — null/omitted falls back to the
+  // category's guide (if any). See sizeGuideId comment in schema.prisma.
+  sizeGuideId: z.string().optional().nullable(),
 });
 
 // Edits are full-object replaces from the admin edit form (not JSON PATCH

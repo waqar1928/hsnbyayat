@@ -25,6 +25,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     isActive: product.isActive,
     variants: product.variants.map((v) => ({ id: v.id, size: v.size, sku: v.sku, stockQty: v.stockQty })),
     images: product.images.map((img) => ({ id: img.id, url: img.url, altText: img.altText || "", sortOrder: img.sortOrder })),
+    sizeGuideId: product.sizeGuideId,
   };
 
   return (

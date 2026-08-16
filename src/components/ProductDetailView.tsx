@@ -7,11 +7,16 @@ import { useUIStore, useToastStore } from "@/lib/uiStore";
 import { effectivePrice, formatPKR, type ProductDetailDTO } from "@/lib/types";
 import { trackFbEvent } from "@/lib/fbPixel";
 import GarmentPlaceholder from "./GarmentPlaceholder";
+import SizeGuideModal from "./SizeGuideModal";
+import ReviewsSection from "./reviews/ReviewsSection";
+import StarRating from "./reviews/StarRating";
 
 export default function ProductDetailView({ product }: { product: ProductDetailDTO }) {
   const [activeImg, setActiveImg] = useState(0);
   const [size, setSize] = useState<string | null>(product.sizes.length === 1 ? product.sizes[0].size : null);
   const [qty, setQty] = useState(1);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUIStore((s) => s.openCart);
@@ -60,7 +65,11 @@ export default function ProductDetailView({ product }: { product: ProductDetailD
   return (
     <div className="pdp">
       <div className="pdp-gallery">
-        <div className="pdp-main-img" style={{ background: `${product.placeholderColor || "#9B988E"}18` }}>
+        <div
+          className="pdp-main-img"
+          style={{ background: `${product.placeholderColor || "#9B988E"}18`, cursor: hasImages ? "zoom-in" : undefined }}
+          onClick={() => hasImages && setLightboxOpen(true)}
+        >
           {sale ? (
             <span className="badge sale">Save {product.salePct}%</span>
           ) : product.badge ? (
@@ -95,11 +104,55 @@ export default function ProductDetailView({ product }: { product: ProductDetailD
         )}
       </div>
 
+      {lightboxOpen && hasImages && (
+        <div className="lightbox open" onClick={() => setLightboxOpen(false)}>
+          <button className="close-btn lightbox-close" aria-label="Close" onClick={() => setLightboxOpen(false)}>
+            ✕
+          </button>
+          <div className="lightbox-img-wrap" onClick={(e) => e.stopPropagation()}>
+            <Image
+              key={product.images[activeImg].url}
+              src={product.images[activeImg].url}
+              alt={product.images[activeImg].altText || product.name}
+              fill
+              sizes="100vw"
+              style={{ objectFit: "contain" }}
+            />
+            {product.images.length > 1 && (
+              <>
+                <button
+                  className="lightbox-nav prev"
+                  aria-label="Previous image"
+                  onClick={() => setActiveImg((i) => (i - 1 + product.images.length) % product.images.length)}
+                >
+                  ‹
+                </button>
+                <button
+                  className="lightbox-nav next"
+                  aria-label="Next image"
+                  onClick={() => setActiveImg((i) => (i + 1) % product.images.length)}
+                >
+                  ›
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="pdp-info">
         <h1>{product.name}</h1>
         <div className="card-meta">
           {product.group} · {product.subcategory} · SKU TF-{product.id.slice(-4).toUpperCase()}
         </div>
+        {product.reviewSummary.count > 0 && (
+          <a href="#reviews" className="pdp-rating-line">
+            <StarRating value={product.reviewSummary.average} size={15} />
+            <span className="note">
+              {product.reviewSummary.average} ({product.reviewSummary.count} review{product.reviewSummary.count === 1 ? "" : "s"})
+            </span>
+          </a>
+        )}
         <div className="price-line">
           {sale ? (
             <>
@@ -115,7 +168,16 @@ export default function ProductDetailView({ product }: { product: ProductDetailD
         </div>
         <div className="pdp-desc">{product.description}</div>
 
-        <div className="qv-label">Size</div>
+        <div className="pdp-size-head">
+          <div className="qv-label" style={{ marginBottom: 0 }}>
+            Size
+          </div>
+          {product.sizeGuide && (
+            <button type="button" className="size-guide-link" onClick={() => setSizeGuideOpen(true)}>
+              Size Guide
+            </button>
+          )}
+        </div>
         <div className="sizes">
           {product.sizes.map((s) => (
             <button
@@ -145,6 +207,13 @@ export default function ProductDetailView({ product }: { product: ProductDetailD
           {size ? `Add to cart — ${formatPKR(effectivePrice(product) * qty)}` : "Select a size"}
         </button>
         <div className="qv-note">Free shipping over Rs. 5,000 · Cash on delivery · 14-day exchange</div>
+      </div>
+
+      {product.sizeGuide && sizeGuideOpen && <SizeGuideModal guide={product.sizeGuide} onClose={() => setSizeGuideOpen(false)} />}
+
+      <div className="pdp-reviews-anchor" id="reviews">
+        <h2 className="pdp-section-heading">Reviews</h2>
+        <ReviewsSection productId={product.id} initialSummary={product.reviewSummary} />
       </div>
     </div>
   );

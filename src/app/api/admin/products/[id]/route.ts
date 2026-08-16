@@ -99,6 +99,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
           badge: input.badge ?? null,
           isBestSeller: input.isBestSeller,
           isActive: input.isActive,
+          sizeGuideId: input.sizeGuideId || null,
         },
         include: { variants: true, images: { orderBy: { sortOrder: "asc" } } },
       });

@@ -35,6 +35,12 @@ enum OrderStatus {
   RETURNED
 }
 
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Category {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -44,10 +50,17 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Category-level size guide fallback: a Product's own sizeGuideId (below)
+  // wins if set; otherwise the storefront falls back to the category's.
+  // Optional by design — most categories won't need one until an admin sets it.
+  sizeGuideId String?
+  sizeGuide   SizeGuide? @relation(fields: [sizeGuideId], references: [id], onDelete: SetNull)
+
   subcategories Subcategory[]
   products      Product[]
 
   @@index([sortOrder])
+  @@index([sizeGuideId])
 }
 
 model Subcategory {
@@ -88,15 +101,23 @@ model Product {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  // Product-specific size guide — overrides the category's, when set.
+  // Resolution order (see src/lib/sizeGuide.ts): product's own guide, then
+  // its category's guide, then no size guide (Size Guide action is hidden).
+  sizeGuideId String?
+  sizeGuide   SizeGuide? @relation(fields: [sizeGuideId], references: [id], onDelete: SetNull)
+
   category    Category       @relation(fields: [categoryId], references: [id])
   subcategory Subcategory    @relation(fields: [subcategoryId], references: [id])
   images      ProductImage[]
   variants    Variant[]
   orderItems  OrderItem[]
+  reviews     ProductReview[]
 
   @@index([categoryId, subcategoryId])
   @@index([isBestSeller])
   @@index([isActive])
+  @@index([sizeGuideId])
 }
 
 model ProductImage {
@@ -192,6 +213,92 @@ model Customer {
 
   addresses Address[]
   orders    Order[]
+  reviews   ProductReview[]
+}
+
+// One review per customer per product (@@unique below) — submitting again
+// updates the existing row rather than creating a duplicate (see
+// src/app/api/reviews/route.ts). Requires a logged-in Customer account
+// (see AGENTS.md-adjacent note in src/app/api/reviews/route.ts for why:
+// checkout is guest-first in this app, so this is the minimum bar that
+// still stops anonymous/unlimited fake reviews without blocking every
+// genuine customer who didn't create an account). isVerifiedPurchase is
+// computed at submit time from the Order/OrderItem history, not something
+// the customer can set — see src/lib/reviews.ts#hasVerifiedPurchase.
+model ProductReview {
+  id                 String       @id @default(cuid())
+  productId          String
+  customerId         String
+  rating             Int
+  title              String?
+  body               String       @db.Text
+  status             ReviewStatus @default(PENDING)
+  isVerifiedPurchase Boolean      @default(false)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, customerId])
+  @@index([productId, status])
+  @@index([customerId])
+}
+
+// A reusable measurement chart. `columns` is a JSON array of column labels
+// (e.g. ["Size","Chest","Waist","Length"]) — deliberately not fixed columns
+// on SizeGuideEntry, since a shoe size chart and a top size chart need
+// entirely different measurement fields, and the business may add new ones
+// later. Mirrors the JSON-in-@db.Text pattern Setting.value already uses
+// elsewhere in this schema. See src/lib/sizeGuide.ts for the typed wrapper.
+model SizeGuide {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  columns     String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entries    SizeGuideEntry[]
+  categories Category[]
+  products   Product[]
+}
+
+model SizeGuideEntry {
+  id          String @id @default(cuid())
+  sizeGuideId String
+  size        String
+  sortOrder   Int    @default(0)
+  // JSON object keyed by SizeGuide.columns, e.g. {"Chest":"34","Waist":"28"}.
+  values      String @db.Text
+
+  sizeGuide SizeGuide @relation(fields: [sizeGuideId], references: [id], onDelete: Cascade)
+
+  @@index([sizeGuideId])
+}
+
+// Homepage promotional banners, admin-managed (Admin → Banners) so nothing
+// is hardcoded into React — see src/app/(storefront)/page.tsx.
+model Banner {
+  id              String    @id @default(cuid())
+  heading         String
+  description     String?   @db.Text
+  ctaText         String?
+  ctaUrl          String?
+  desktopImageUrl String
+  // Falls back to desktopImageUrl on the storefront when unset — a mobile
+  // crop is a nice-to-have, not a requirement to publish a banner.
+  mobileImageUrl  String?
+  isActive        Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  // Both optional: null startsAt = visible immediately, null endsAt = runs
+  // indefinitely. A banner outside its window is excluded even if isActive.
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive, sortOrder])
 }
 
 model Address {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { pctFromPrice } from "@/lib/money";
 import { adminFetch } from "@/lib/adminFetch";
 import { slugify } from "@/lib/slug";
@@ -10,6 +11,7 @@ type VariantRow = { id?: string; size: string; sku: string; stockQty: number };
 type ImageRow = { id?: string; url: string; altText: string; sortOrder: number };
 type SubcategoryOption = { id: string; name: string };
 type CategoryOption = { id: string; name: string; subcategories: SubcategoryOption[] };
+type SizeGuideOption = { id: string; name: string };
 
 export type ProductFormValue = {
   id?: string;
@@ -25,6 +27,7 @@ export type ProductFormValue = {
   isActive: boolean;
   variants: VariantRow[];
   images: ImageRow[];
+  sizeGuideId: string | null;
 };
 
 const EMPTY: ProductFormValue = {
@@ -40,6 +43,7 @@ const EMPTY: ProductFormValue = {
   isActive: true,
   variants: [{ size: "", sku: "", stockQty: 0 }],
   images: [],
+  sizeGuideId: null,
 };
 
 export default function ProductForm({ initial }: { initial?: ProductFormValue }) {
@@ -60,6 +64,9 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
   const [addingSubcategory, setAddingSubcategory] = useState(false);
   const [newSubcategoryName, setNewSubcategoryName] = useState("");
   const [categoryBusy, setCategoryBusy] = useState(false);
+  const [sizeGuides, setSizeGuides] = useState<SizeGuideOption[]>([]);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceIdx = useRef<number | null>(null);
 
   function loadCategories() {
     adminFetch<{ items: (CategoryOption & { isActive: boolean })[] }>("/api/admin/categories").then((data) =>
@@ -67,6 +74,9 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
     );
   }
   useEffect(loadCategories, []);
+  useEffect(() => {
+    adminFetch<{ items: SizeGuideOption[] }>("/api/admin/size-guides").then((data) => setSizeGuides(data.items));
+  }, []);
 
   function set<K extends keyof ProductFormValue>(key: K, v: ProductFormValue[K]) {
     setValue((s) => ({ ...s, [key]: v }));
@@ -174,6 +184,45 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
     );
   }
 
+  /** Moves an image to index 0 — "Primary" is simply whichever image sorts first. */
+  function setPrimary(i: number) {
+    if (i === 0) return;
+    const next = [...value.images];
+    const [moved] = next.splice(i, 1);
+    next.unshift(moved);
+    set(
+      "images",
+      next.map((img, idx) => ({ ...img, sortOrder: idx }))
+    );
+  }
+
+  function startReplace(i: number) {
+    replaceIdx.current = i;
+    replaceInputRef.current?.click();
+  }
+
+  async function onReplaceFileSelected(files: FileList | null) {
+    const file = files?.[0];
+    const i = replaceIdx.current;
+    if (!file || i === null) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const data = await adminFetch<{ url: string }>("/api/admin/uploads", { method: "POST", body: form });
+      set(
+        "images",
+        value.images.map((img, idx) => (idx === i ? { ...img, url: data.url } : img))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not replace that image.");
+    } finally {
+      setUploading(false);
+      replaceIdx.current = null;
+      if (replaceInputRef.current) replaceInputRef.current.value = "";
+    }
+  }
+
   function onDragStart(i: number) {
     dragIdx.current = i;
   }
@@ -222,6 +271,7 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
         isActive: value.isActive,
         variants: value.variants.map((v) => ({ id: v.id, size: v.size, sku: v.sku, stockQty: Number(v.stockQty) })),
         images: value.images.map((img) => ({ id: img.id, url: img.url, altText: img.altText, sortOrder: img.sortOrder })),
+        sizeGuideId: value.sizeGuideId || null,
       };
       const url = isEdit ? `/api/admin/products/${value.id}` : "/api/admin/products";
       await adminFetch(url, {
@@ -442,6 +492,32 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
 
           <div className="admin-panel">
             <div className="admin-panel-head">
+              <h2>Sizing</h2>
+            </div>
+            <div className="admin-panel-body">
+              <div className="field">
+                <label>Size guide</label>
+                <select value={value.sizeGuideId || ""} onChange={(e) => set("sizeGuideId", e.target.value || null)}>
+                  <option value="">Use category default (or none)</option>
+                  {sizeGuides.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="note" style={{ textAlign: "left", marginTop: 6 }}>
+                  Overrides the category&apos;s size guide, if any. Manage charts under{" "}
+                  <Link href="/admin/size-guides" style={{ textDecoration: "underline" }}>
+                    Admin → Size Guides
+                  </Link>
+                  .
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="admin-panel">
+            <div className="admin-panel-head">
               <h2>Images</h2>
             </div>
             <div className="admin-panel-body">
@@ -456,30 +532,53 @@ export default function ProductForm({ initial }: { initial?: ProductFormValue })
                   onChange={(e) => onFilesSelected(e.target.files)}
                 />
               </label>
+              {/* Shared hidden input for the "Replace" action on any thumbnail — startReplace() points it at the right slot before opening the picker. */}
+              <input
+                ref={replaceInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => onReplaceFileSelected(e.target.files)}
+              />
               {value.images.length === 0 ? (
                 <div className="note" style={{ marginTop: 10 }}>
                   No photos yet — the drawn garment placeholder will show on the storefront until you add some.
                 </div>
               ) : (
-                <div className="image-thumb-grid">
-                  {value.images.map((img, i) => (
-                    <div
-                      key={img.url}
-                      className="image-thumb"
-                      draggable
-                      onDragStart={() => onDragStart(i)}
-                      onDragOver={onDragOver}
-                      onDrop={() => onDrop(i)}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt={img.altText || value.name} />
-                      <button className="rm-btn" type="button" onClick={() => removeImage(i)} aria-label="Remove image">
-                        ✕
-                      </button>
-                      {i === 0 && <div className="primary-tag">Primary</div>}
-                    </div>
-                  ))}
-                </div>
+                <>
+                  <div className="note" style={{ textAlign: "left", marginTop: 10 }}>
+                    Drag to reorder — the first photo is the primary image shown on collection pages.
+                  </div>
+                  <div className="image-thumb-grid">
+                    {value.images.map((img, i) => (
+                      <div
+                        key={img.url}
+                        className="image-thumb"
+                        draggable
+                        onDragStart={() => onDragStart(i)}
+                        onDragOver={onDragOver}
+                        onDrop={() => onDrop(i)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.url} alt={img.altText || value.name} />
+                        <button className="rm-btn" type="button" onClick={() => removeImage(i)} aria-label="Remove image">
+                          ✕
+                        </button>
+                        {i === 0 && <div className="primary-tag">Primary</div>}
+                        <div className="image-thumb-actions">
+                          {i !== 0 && (
+                            <button type="button" className="admin-btn small outline" onClick={() => setPrimary(i)}>
+                              Set primary
+                            </button>
+                          )}
+                          <button type="button" className="admin-btn small outline" onClick={() => startReplace(i)}>
+                            Replace
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>

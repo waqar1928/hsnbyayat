@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       badge: input.badge ?? null,
       isBestSeller: input.isBestSeller,
       isActive: input.isActive,
+      sizeGuideId: input.sizeGuideId || null,
       variants: { create: input.variants.map((v) => ({ size: v.size, sku: v.sku, stockQty: v.stockQty })) },
       images: {
         create: input.images.map((img) => ({ url: img.url, altText: img.altText ?? null, sortOrder: img.sortOrder })),

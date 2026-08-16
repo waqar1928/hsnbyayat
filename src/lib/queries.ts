@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
+import { getReviewSummary } from "@/lib/reviews";
+import { getSizeGuideForProduct } from "@/lib/sizeGuide";
 
 // Shared read-query functions used by both API route handlers (for the
 // client-side fetch calls) and Server Components (direct import, no HTTP
@@ -192,6 +194,11 @@ export async function getProductBySlug(slug: string) {
   });
   if (!product || !product.isActive) return null;
 
+  const [reviewSummary, sizeGuide] = await Promise.all([
+    getReviewSummary(product.id),
+    getSizeGuideForProduct(product.id),
+  ]);
+
   return {
     id: product.id,
     slug: product.slug,
@@ -214,7 +221,33 @@ export async function getProductBySlug(slug: string) {
       available: v.stockQty > 0,
       lowStockRemaining: v.stockQty > 0 && v.stockQty < LOW_STOCK_THRESHOLD ? v.stockQty : null,
     })),
+    reviewSummary,
+    sizeGuide,
   };
+}
+
+/** Active banners for the homepage, respecting the optional start/end window. */
+export async function getActiveBanners() {
+  const now = new Date();
+  const banners = await prisma.banner.findMany({
+    where: {
+      isActive: true,
+      AND: [
+        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+        { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+      ],
+    },
+    orderBy: { sortOrder: "asc" },
+  });
+  return banners.map((b) => ({
+    id: b.id,
+    heading: b.heading,
+    description: b.description,
+    ctaText: b.ctaText,
+    ctaUrl: b.ctaUrl,
+    desktopImageUrl: b.desktopImageUrl,
+    mobileImageUrl: b.mobileImageUrl,
+  }));
 }
 
 export async function getCollectionsTree() {

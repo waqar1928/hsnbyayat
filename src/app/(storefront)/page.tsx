@@ -1,22 +1,24 @@
 import { getAllPublicSettings } from "@/lib/settings";
 import type { HeroSlide, BrandSettings } from "@/lib/settings";
-import { getProductList, getBestSellers, getBestSellerTabs, getCategoryTiles } from "@/lib/queries";
+import { getProductList, getBestSellers, getBestSellerTabs, getCategoryTiles, getActiveBanners } from "@/lib/queries";
 import HeroSlider from "@/components/HeroSlider";
 import Marquee from "@/components/Marquee";
 import CategoryTiles from "@/components/CategoryTiles";
 import BestSellers from "@/components/BestSellers";
 import PromoSplit from "@/components/PromoSplit";
 import CollectionGrid from "@/components/CollectionGrid";
+import BannerCarousel from "@/components/BannerCarousel";
 
 type SearchParams = { sort?: string; page?: string };
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
-  const [settings, tiles, bestSellerTabs, collection] = await Promise.all([
+  const [settings, tiles, bestSellerTabs, collection, banners] = await Promise.all([
     getAllPublicSettings(),
     getCategoryTiles(),
     getBestSellerTabs(),
     getProductList({ sort: sp.sort, page: sp.page ? Number(sp.page) : 1 }),
+    getActiveBanners(),
   ]);
 
   const initialTabSlug = bestSellerTabs[0]?.slug || "";
@@ -30,6 +32,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <>
       <HeroSlider slides={heroSlides} brandName={brand.name} />
       <Marquee text={marqueeText} />
+      <BannerCarousel banners={banners} />
       <CategoryTiles tiles={tiles} />
       <BestSellers
         tabs={bestSellerTabs.map((t) => ({ name: t.name, slug: t.slug }))}

@@ -23,6 +23,30 @@ export type ProductSizeDTO = {
   lowStockRemaining: number | null;
 };
 
+export type ReviewDTO = {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  customerName: string;
+  isVerifiedPurchase: boolean;
+  createdAt: Date;
+};
+
+export type ReviewSummaryDTO = {
+  average: number;
+  count: number;
+  breakdown: { rating: number; count: number }[];
+};
+
+export type SizeGuideDTO = {
+  id: string;
+  name: string;
+  description: string | null;
+  columns: string[];
+  entries: { size: string; values: Record<string, string> }[];
+};
+
 export type ProductDetailDTO = {
   id: string;
   slug: string;
@@ -40,6 +64,8 @@ export type ProductDetailDTO = {
   placeholderColor: string | null;
   images: { url: string; altText: string | null }[];
   sizes: ProductSizeDTO[];
+  reviewSummary: ReviewSummaryDTO;
+  sizeGuide: SizeGuideDTO | null;
 };
 
 export type ProductListResponse = {

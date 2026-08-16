@@ -19,6 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: product.name,
     description: product.description || `${product.name} — ${product.group} from HSN BY AYAT.`,
+    alternates: { canonical: `/products/${product.slug}` },
     openGraph: product.images[0] ? { images: [{ url: product.images[0].url }] } : undefined,
   };
 }
@@ -28,8 +29,36 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  // Product structured data — aggregateRating is only included when there's
+  // at least one real APPROVED review behind it (getReviewSummary never
+  // counts pending/rejected), never a fabricated/placeholder rating.
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.description,
+    image: product.images.map((img) => `${siteUrl}${img.url}`),
+    sku: `TF-${product.id.slice(-4).toUpperCase()}`,
+    offers: {
+      "@type": "Offer",
+      url: `${siteUrl}/products/${product.slug}`,
+      priceCurrency: "PKR",
+      price: product.salePct && product.salePrice ? product.salePrice : product.price,
+      availability: product.sizes.some((s) => s.available) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+  };
+  if (product.reviewSummary.count > 0) {
+    jsonLd.aggregateRating = {
+      "@type": "AggregateRating",
+      ratingValue: product.reviewSummary.average,
+      reviewCount: product.reviewSummary.count,
+    };
+  }
+
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="breadcrumb-bar">
         <Link href="/">Home</Link> / <Link href={`/shop?group=${product.groupSlug}`}>{product.group}</Link> / {product.name}
       </div>
