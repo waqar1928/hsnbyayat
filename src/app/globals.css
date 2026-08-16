@@ -2654,7 +2654,7 @@ header {
 /* --- Homepage banner carousel --- */
 .banner-carousel {
   position: relative;
-  margin: 0 auto;
+  margin: 40px auto 0;
   max-width: 1440px;
   overflow: hidden;
 }
@@ -2728,6 +2728,9 @@ header {
   background: var(--white);
 }
 @media (max-width: 820px) {
+  .banner-carousel {
+    margin-top: 26px;
+  }
   .banner-slide {
     aspect-ratio: 1080 / 1350;
   }
