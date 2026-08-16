@@ -28,3 +28,13 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(1),
   newPassword: z.string().min(8).max(100),
 });
+
+// Used when one logged-in admin sets another admin's password directly
+// (Admin users page) — deliberately no currentPassword field, unlike
+// changePasswordSchema: the acting admin's own session is the
+// authorization, not the target account's current password (which they
+// wouldn't know). Only ever used on *other* admins, never your own
+// account — see the self-reset guard in the route handler.
+export const adminResetPasswordSchema = z.object({
+  newPassword: z.string().min(8).max(100),
+});

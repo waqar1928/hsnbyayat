@@ -22,6 +22,13 @@ export default function AdminAdminsPage() {
   const [passwordSaved, setPasswordSaved] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
+  const [currentAdminId, setCurrentAdminId] = useState<string | null>(null);
+  const [resetTargetId, setResetTargetId] = useState<string | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
   // `fetchAdmins` is the actual data fetch; `load` additionally flips the
   // loading flag back on for the two post-mutation refetches below (invite,
   // remove). The mount effect calls `fetchAdmins` directly — `loading`
@@ -38,6 +45,7 @@ export default function AdminAdminsPage() {
 
   useEffect(() => {
     fetchAdmins();
+    adminFetch<{ id: string }>("/api/admin/auth/me").then((me) => setCurrentAdminId(me.id));
   }, []);
 
   async function invite(e: React.FormEvent) {
@@ -88,6 +96,36 @@ export default function AdminAdminsPage() {
     }
   }
 
+  function openReset(id: string) {
+    setResetTargetId(id);
+    setResetPassword("");
+    setResetConfirm("");
+    setResetError(null);
+  }
+
+  async function submitReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetTargetId) return;
+    setResetError(null);
+    if (resetPassword !== resetConfirm) {
+      setResetError("Passwords don't match.");
+      return;
+    }
+    setResetting(true);
+    try {
+      await adminFetch(`/api/admin/admins/${resetTargetId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword: resetPassword }),
+      });
+      setResetTargetId(null);
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Could not reset password.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("Remove this admin? They will no longer be able to log in.")) return;
     try {
@@ -126,13 +164,27 @@ export default function AdminAdminsPage() {
                 )}
                 {items.map((a) => (
                   <tr key={a.id}>
-                    <td>{a.name}</td>
+                    <td>
+                      {a.name}
+                      {a.id === currentAdminId && (
+                        <span className="note" style={{ marginLeft: 6 }}>
+                          (you)
+                        </span>
+                      )}
+                    </td>
                     <td>{a.email}</td>
                     <td>{new Date(a.createdAt).toLocaleDateString("en-PK")}</td>
                     <td>
-                      <button className="admin-btn small danger" onClick={() => remove(a.id)}>
-                        Remove
-                      </button>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        {a.id !== currentAdminId && (
+                          <button className="admin-btn small outline" onClick={() => openReset(a.id)}>
+                            Reset password
+                          </button>
+                        )}
+                        <button className="admin-btn small danger" onClick={() => remove(a.id)}>
+                          Remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -213,6 +265,53 @@ export default function AdminAdminsPage() {
           </div>
         </div>
       </div>
+
+      {resetTargetId && (
+        <div className="modal open">
+          <div className="modal-box">
+            <div className="modal-head">
+              <h3>Reset password for {items.find((a) => a.id === resetTargetId)?.name}</h3>
+              <button className="close-btn" onClick={() => setResetTargetId(null)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              {resetError && <div className="admin-error" style={{ marginBottom: 14 }}>{resetError}</div>}
+              <form onSubmit={submitReset}>
+                <div className="field">
+                  <label>New password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    minLength={8}
+                    autoFocus
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label>Confirm new password</label>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    value={resetConfirm}
+                    onChange={(e) => setResetConfirm(e.target.value)}
+                    minLength={8}
+                    required
+                  />
+                </div>
+                <div className="note" style={{ textAlign: "left", marginBottom: 14 }}>
+                  They&apos;ll need to log in with this new password — it doesn&apos;t require knowing their old one.
+                </div>
+                <button className="admin-btn" style={{ width: "100%" }} disabled={resetting}>
+                  {resetting ? "Saving…" : "Set new password"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
