@@ -14,6 +14,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// getAdminSession() below uses cookies() internally, which normally forces
+// dynamic rendering on its own — explicit here anyway (no downside: unlike
+// the storefront's product page, nothing under /admin wants ISR/static
+// caching). See src/app/(storefront)/page.tsx for why implicit dynamism
+// alone isn't a safe bet for keeping a route out of `next build`.
+export const dynamic = "force-dynamic";
+
 export default async function AdminProtectedLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
   if (!session) redirect("/admin/login");

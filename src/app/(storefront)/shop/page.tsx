@@ -3,6 +3,10 @@ import { collectionTitle } from "@/lib/types";
 import CollectionGrid from "@/components/CollectionGrid";
 import type { Metadata } from "next";
 
+// See src/app/(storefront)/page.tsx for why this is explicit rather than
+// relying on searchParams usage alone to keep this out of `next build`.
+export const dynamic = "force-dynamic";
+
 type SearchParams = {
   group?: string;
   sub?: string;

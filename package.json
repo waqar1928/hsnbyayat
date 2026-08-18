@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "tsx prisma/deploy-seed-if-empty.ts && tsx prisma/apply-schema-migration.ts && tsx prisma/migrate-legacy-uploads.ts && next build",
+    "build:docker": "next build",
     "start": "NODE_ENV=production node server.js",
     "lint": "eslint",
     "db:migrate": "prisma migrate dev",

@@ -9,6 +9,14 @@ import PromoSplit from "@/components/PromoSplit";
 import CollectionGrid from "@/components/CollectionGrid";
 import BannerCarousel from "@/components/BannerCarousel";
 
+// Accepting `searchParams` alone doesn't reliably stop Next from attempting
+// a build-time prerender of this route — confirmed the hard way in the
+// Docker build, where the database isn't reachable until the container is
+// actually running (see Dockerfile's builder-stage comment). An explicit
+// force-dynamic guarantees this page is never touched during `next build`,
+// on any deployment target.
+export const dynamic = "force-dynamic";
+
 type SearchParams = { sort?: string; page?: string };
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {

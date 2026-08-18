@@ -1,6 +1,16 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 
+// Without this, sitemap.xml is a "special Route Handler" Next statically
+// prerenders at build time by default — which means `next build` needs a
+// live database connection just to finish. That's fine on hosts where the
+// build runs somewhere the DB is already reachable (Hostinger), but breaks
+// the Docker/VPS path, where the database is only reachable once the
+// container is actually running, never during `docker build`. Forcing this
+// dynamic makes sitemap.xml render per-request instead — also arguably more
+// correct anyway (always reflects the current catalog, never build-stale).
+export const dynamic = "force-dynamic";
+
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

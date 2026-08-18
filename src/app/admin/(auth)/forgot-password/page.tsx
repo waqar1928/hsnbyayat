@@ -4,6 +4,9 @@ import AdminForgotPasswordForm from "@/components/admin/AdminForgotPasswordForm"
 
 export const metadata: Metadata = { title: "Reset password", robots: { index: false, follow: false } };
 
+// See src/app/(storefront)/page.tsx for why this is explicit.
+export const dynamic = "force-dynamic";
+
 export default async function AdminForgotPasswordPage() {
   const brand = await getSetting<BrandSettings>(SETTING_KEYS.BRAND);
   return <AdminForgotPasswordForm brandName={brand.name} logoUrl={brand.logoUrl} />;
