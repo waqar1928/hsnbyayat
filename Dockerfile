@@ -5,8 +5,10 @@
 
 # Node 22 required: @prisma/streams-local (a transitive Prisma 7 dependency)
 # declares an engines.node >=22.0.0 requirement — npm ci warns/can fail
-# resolving it on Node 20.
-FROM node:22-slim AS base
+# resolving it on Node 20. Pinned to the explicit Debian codename (rather
+# than the floating node:22-slim tag) so the base OS doesn't silently shift
+# out from under this image later.
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
 # --- deps ---
