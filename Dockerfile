@@ -3,7 +3,7 @@
 # Ships with the full node_modules (not Next's "standalone" trimming) so the
 # Prisma CLI stays available at runtime for `prisma migrate deploy` on boot.
 
-FROM node:20-slim AS base
+FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
 # --- deps ---
