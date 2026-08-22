@@ -38,6 +38,44 @@ services:
           - hsnbyayat-app
     restart: unless-stopped
 
+  # The database this app actually runs on. It was already running in
+  # production long before it appeared here: the container existed with Compose
+  # labels (project=hsnbyayat, service=db) but no committed service definition,
+  # so `git log -S mariadb -- docker-compose.yml` found nothing. That made the
+  # store's database untracked infrastructure — reproducible only from whatever
+  # uncommitted file originally created it.
+  #
+  # The practical danger was not theoretical. With no `db` service here, Compose
+  # treated the running container as an orphan and printed
+  #   "Found orphan containers (hsnbyayat-db) ... run with --remove-orphans"
+  # on every single `up`. Following that suggestion stops and deletes the
+  # database container. The named volume below survives (Compose does not remove
+  # named volumes), so the data itself is safe — but the container is gone, the
+  # store is down, and it cannot be rebuilt from this repo. Defining the service
+  # here removes both the warning and the trap.
+  db:
+    image: mariadb:11
+    # Explicit, because the app connects to `db` and existing tooling refers to
+    # the container as hsnbyayat-db. Compose's default would be hsnbyayat-db-1.
+    container_name: hsnbyayat-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: hsnbyayat
+      MARIADB_USER: hsnbyayat
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+    volumes:
+      # Resolves to the existing hsnbyayat_hsnbyayat_db_data volume: Compose
+      # prefixes volume names with the project name, so the key below gains a
+      # second "hsnbyayat_". Verify with `docker volume ls` before changing this
+      # — a wrong name silently creates an EMPTY volume and starts a blank
+      # database rather than failing.
+      - hsnbyayat_db_data:/var/lib/mysql
+    networks:
+      # Internal only. No `ports:` entry — the database must never be reachable
+      # from the host or the internet, only from `app` over this network.
+      - internal
+
 networks:
   internal:
     external: true
@@ -66,3 +104,6 @@ networks:
 
 volumes:
   uploads-data:
+  # Pre-existing volume holding the live MariaDB data directory. Declared, not
+  # created — it already contains production data.
+  hsnbyayat_db_data:
