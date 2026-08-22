@@ -1,8 +1,11 @@
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
+    # No `ports:` entry on purpose. Publishing 3000 bound it to 0.0.0.0, so the
+    # app was reachable over plain HTTP from the whole internet at
+    # http://<VPS_IP>:3000 — bypassing Caddy, and therefore bypassing TLS and
+    # every security header set there. Caddy reaches this container over the
+    # shared web_proxy network instead, which needs no published port.
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to a mysql:// connection string}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in a .env file or your shell}
@@ -22,11 +25,15 @@ services:
       internal:
       edge:
         # Compose names the container hsnbyayat-app-1 (service name + replica
-        # index), but the shared Caddy instance's Caddyfile (a separate,
-        # drevia-managed config outside this repo) already points at
+        # index), but the shared Caddy config points at
         # reverse_proxy hsnbyayat-app:3000 — this alias makes that hostname
-        # resolve on the edge network without touching Caddy's config or
+        # resolve on the shared network without touching Caddy's config or
         # renaming the container.
+        #
+        # Keep this alias. Attaching the container to a network by hand
+        # (docker network connect) does NOT inherit aliases declared here, so a
+        # manual reattach that omits --alias hsnbyayat-app silently breaks
+        # Caddy's name resolution and every request 502s.
         aliases:
           - hsnbyayat-app
     restart: unless-stopped
@@ -35,15 +42,27 @@ networks:
   internal:
     external: true
     name: hsnbyayat_internal
-  # Shared reverse-proxy network — the standalone Caddy container (serving
-  # hsnbyayat.com + other apps on this VPS) lives here, not on
-  # hsnbyayat_internal. Without this, Caddy's reverse_proxy hsnbyayat-app:3000
-  # can't resolve the container at all (Docker DNS only resolves within a
-  # shared network) — every request 502s even though the app itself is
-  # healthy. Same network drevia-web (also Caddy-proxied) is already on.
+  # Shared reverse-proxy network. The Caddy container serving hsnbyayat.com
+  # lives here, not on hsnbyayat_internal. Without this, Caddy's
+  # reverse_proxy hsnbyayat-app:3000 can't resolve the container at all (Docker
+  # DNS only resolves within a shared network) — every request 502s even though
+  # the app itself is healthy.
+  #
+  # `external: true` means this network is NOT created or owned by this project.
+  # It belongs to the standalone Caddy project on the VPS (~/caddy), which is
+  # deliberately outside every application repo: this app previously attached to
+  # a network owned by an unrelated project, so that project's deploys could
+  # affect this one's routing. Nothing here creates, modifies, or removes the
+  # shared network or the proxy — `docker compose down` in this repo cannot take
+  # down any other site.
+  #
+  # The key is still `edge` rather than `web_proxy` only because renaming it
+  # changes Compose's resolved config and would force an unnecessary container
+  # recreation (a brief 502) on the next deploy. Rename it during a maintenance
+  # window if you want the names to match.
   edge:
     external: true
-    name: drevia_edge
+    name: web_proxy
 
 volumes:
   uploads-data:
